@@ -8,7 +8,7 @@ on:
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
 
-  
+
 jobs:
   apply:
     environment: EKS
@@ -169,3 +169,6 @@ jobs:
 
       - name: Success message
         run: echo "Terraform apply finished — cluster created and access entries (if present) validated."
+
+      - name: Terraform Destroy
+        run: terraform destroy -auto-approve    
