@@ -33,9 +33,9 @@ variable "admin_cidr" {
   type = string
 }
 
-variable "ssh_key_name" {
-  type = string
-}
+# variable "ssh_key_name" {
+#   type = string
+# }
 
 variable "bastion_ami" {
   default = "ami-0b6c6ebed2801a5cb"
