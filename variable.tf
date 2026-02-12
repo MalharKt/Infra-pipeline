@@ -1,6 +1,6 @@
 variable "region" {
   default = "us-east-1"
-  type = string
+  type    = string
 }
 
 variable "name" {
@@ -39,7 +39,7 @@ variable "ssh_key_name" {
 
 variable "bastion_ami" {
   default = "ami-0b6c6ebed2801a5cb"
-  type = string
+  type    = string
 }
 
 variable "bastion_instance_type" {
