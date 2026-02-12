@@ -6,87 +6,125 @@ on:
       - dev
 
 env:
-  AWS_REGION: ${{ secrets.AWS_REGION }}
-
+  AWS_REGION: ${{ secrets.AWS_REGION }}  
 
 jobs:
-  apply:
+
+  plan:
     environment: EKS
+    name: Terraform Plan
     runs-on: [self-hosted]
-    timeout-minutes: 180
+    timeout-minutes: 90
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials (from Secrets)
         shell: bash
         run: |
-          echo "Exporting AWS credentials as environment variables"
-
+          # Export minimal env vars for AWS CLI & Terraform
           echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> $GITHUB_ENV
           echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
-          echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> $GITHUB_ENV
           echo "AWS_DEFAULT_REGION=${{ secrets.AWS_REGION }}" >> $GITHUB_ENV
 
-          # optional sanity check
-          aws sts get-caller-identity
-
-      - name: Ensure required tools exist (terraform, aws, jq)
+      - name: Verify required tools
         shell: bash
         run: |
           if ! command -v terraform >/dev/null; then
-            echo "ERROR: terraform not found on runner"
+            echo "terraform not found on runner"
             exit 1
           fi
           if ! command -v aws >/dev/null; then
-            echo "ERROR: aws CLI not found on runner"
+            echo "aws CLI not found on runner"
             exit 1
           fi
           if ! command -v jq >/dev/null; then
-            echo "jq not found, installing (requires sudo)"
-            sudo apt-get update -y
-            sudo apt-get install -y jq
+            echo "jq not found on runner"
+            exit 1
           fi
           terraform -version
           aws --version
           jq --version
 
-      - name: DEBUG – verify environment secrets
-        run: |
-          echo "AWS_REGION=$AWS_REGION"
-          aws sts get-caller-identity
-          
       - name: Terraform Init
         shell: bash
         run: terraform init -input=false
         working-directory: .
 
-      - name: Terraform Validate & Plan
+      - name: Terraform Validate
         shell: bash
-        run: terraform validate && terraform plan -out=tfplan -input=false
+        run: terraform validate
         working-directory: .
 
-      - name: Terraform Apply
+      - name: Terraform Plan (create tfplan)
+        id: tfplan
+        shell: bash
+        run: terraform plan -out=tfplan -input=false
+        working-directory: .
+
+      - name: Upload tfplan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: tfplan
+
+      - name: show short plan summary
+        shell: bash
+        run: terraform show -no-color tfplan | head -n 200
+        working-directory: .  
+
+
+  apply:
+    environment: EKS
+    name: Terraform Apply (manual)
+    runs-on: [self-hosted]
+    needs: plan
+    timeout-minutes: 180
+
+    # Only run apply when workflow was triggered manually AND confirm_apply == "APPLY"
+    if: >
+     github.event_name == 'workflow_dispatch' &&
+        github.event.inputs.confirm_apply == 'APPLY'
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (from Secrets)
+        shell: bash
+        run: |
+          echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> $GITHUB_ENV
+          echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
+          echo "AWS_DEFAULT_REGION=${{ secrets.AWS_REGION }}" >> $GITHUB_ENV
+
+      - name: Download tfplan artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+          path: .
+
+      - name: Terraform Init (ensure backend is ready)
+        shell: bash
+        run: terraform init -input=false
+        working-directory: .
+
+      - name: Terraform Apply (use saved plan)
         shell: bash
         run: terraform apply -input=false -auto-approve tfplan
         working-directory: .
 
-      - name: Export Terraform outputs
+      - name: Export Terraform outputs (JSON)
         id: tfout
         shell: bash
         run: |
           terraform output -json > tfoutputs.json
           cat tfoutputs.json
-          # extract values; adapt keys if your outputs use different names
-          BASTION_ID=$(jq -r '.bastion_instance_id.value' tfoutputs.json)
-          BASTION_ROLE_ARN=$(jq -r '.bastion_role_arn.value' tfoutputs.json)
-          CLUSTER_NAME=$(jq -r '.eks_cluster_name.value' tfoutputs.json)
 
-          # expose to later steps via GITHUB_OUTPUT
-          echo "BASTION_ID=${BASTION_ID}" >> $GITHUB_OUTPUT
-          echo "BASTION_ROLE_ARN=${BASTION_ROLE_ARN}" >> $GITHUB_OUTPUT
-          echo "CLUSTER_NAME=${CLUSTER_NAME}" >> $GITHUB_OUTPUT
+        working-directory: .
+
+      - name: Success message
+        run: echo "Terraform apply finished successfully."
 
       - name: Wait for SSM agent on bastion
         shell: bash
@@ -166,9 +204,3 @@ jobs:
           else
             echo "Warning: PRINCIPAL_ARN empty — check terraform outputs"
           fi
-
-      - name: Success message
-        run: echo "Terraform apply finished — cluster created and access entries (if present) validated."
-
-      - name: Terraform Destroy
-        run: terraform destroy -auto-approve    
