@@ -69,10 +69,10 @@ jobs:
           name: tfplan
           path: tfplan
 
-      - name: show short plan summary
-        shell: bash
-        run: terraform show -no-color tfplan | head -n 200
-        working-directory: .  
+    #   - name: show short plan summary
+    #     shell: bash
+    #     run: terraform show -no-color tfplan | head -n 200
+    #     working-directory: .  
 
 
   apply:
