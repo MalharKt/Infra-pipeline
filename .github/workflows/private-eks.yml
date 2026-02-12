@@ -10,6 +10,7 @@ env:
 
 jobs:
   apply:
+    environment: EKS
     runs-on: [self-hosted]
     timeout-minutes: 180
 
@@ -50,6 +51,11 @@ jobs:
           aws --version
           jq --version
 
+      - name: DEBUG – verify environment secrets
+        run: |
+          echo "AWS_REGION=$AWS_REGION"
+          aws sts get-caller-identity
+          
       - name: Terraform Init
         shell: bash
         run: terraform init -input=false
