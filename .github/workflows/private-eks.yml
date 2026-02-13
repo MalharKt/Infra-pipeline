@@ -126,7 +126,14 @@ jobs:
         shell: bash
         run: |
           terraform output -json > tfoutputs.json
-          cat tfoutputs.json
+
+          BASTION_ID=$(jq -r '.bastion_instance_id.value' tfoutputs.json)
+          BASTION_ROLE_ARN=$(jq -r '.bastion_role_arn.value' tfoutputs.json)
+          CLUSTER_NAME=$(jq -r '.eks_cluster_name.value' tfoutputs.json)
+  
+          echo "BASTION_ID=${BASTION_ID}" >> $GITHUB_OUTPUT
+          echo "BASTION_ROLE_ARN=${BASTION_ROLE_ARN}" >> $GITHUB_OUTPUT
+          echo "CLUSTER_NAME=${CLUSTER_NAME}" >> $GITHUB_OUTPUT
 
         working-directory: .
 
