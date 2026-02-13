@@ -1,4 +1,4 @@
-name: private-eks
+name: private-eks-create
 
 on:
   push:
