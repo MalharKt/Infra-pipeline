@@ -1,6 +1,9 @@
 name: test-dispatch
 
 on:
+  push:
+    branches:
+      - dev
   workflow_dispatch:
     inputs:
       confirm_apply:
