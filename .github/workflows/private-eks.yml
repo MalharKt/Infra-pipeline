@@ -3,7 +3,7 @@ name: private-eks
 on:
   push:
     branches:
-      - dev
+      - main
   workflow_dispatch:
     inputs:
       confirm_apply:
