@@ -1,0 +1,18 @@
+name: test-dispatch
+
+on:
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
+    inputs:
+      confirm_apply:
+        description: "Type APPLY to confirm"
+        required: true
+        default: "NO"
+
+jobs:
+  hello:
+    runs-on: [self-hosted]
+    steps:
+      - run: echo "Hello — confirm_apply=${{ github.event.inputs.confirm_apply }}"
