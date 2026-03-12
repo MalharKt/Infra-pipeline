@@ -1,5 +1,4 @@
 name: private-eks-create
-
 on:
   push:
     branches:
